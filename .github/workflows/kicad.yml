@@ -9,8 +9,9 @@ on:
 jobs:
   erc-drc:
     runs-on: ubuntu-latest
+    # Image tag must match toolchain/kicad-version.txt
     container:
-      image: ghcr.io/kicad/kicad:9.0
+      image: ghcr.io/kicad/kicad:10.0.3
     steps:
       - uses: actions/checkout@v4
 

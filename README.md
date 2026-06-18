@@ -17,7 +17,7 @@ toolchain/         Pinned tool versions for reproducible builds
 
 | Tool | Version | Notes |
 |------|---------|-------|
-| KiCad | 9.0 | Schematic and PCB layout |
+| KiCad | 10.0.3 | Schematic and PCB layout |
 | ESPHome | 2025.5.x | Thermostat firmware (`toolchain/esphome-version.txt`) |
 | ESP-IDF | 5.3.x | Via PlatformIO for `esp32-c6-devkitc-1` |
 | PlatformIO espressif32 | 6.9.x | Central board firmware (when added) |

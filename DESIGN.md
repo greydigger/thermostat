@@ -986,13 +986,13 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 
 **Title:** `chore: initialize monorepo layout and development tooling`
 
-**Files:** `README.md`, `docs/`, `.gitignore`, `.github/workflows/`, `toolchain/versions.md`
+**Files:** `README.md`, `docs/`, `.gitignore`, `.github/workflows/`, `toolchain/versions.md`, `toolchain/kicad-version.txt`
 
 **Tool versions (pinned):**
 
 | Tool | Version |
 |------|---------|
-| KiCad | **9.0** |
+| KiCad | **10.0.3** (pin in `toolchain/kicad-version.txt`) |
 | ESPHome | **2025.5.x** (pin in `toolchain/esphome-version.txt`) |
 | ESP-IDF (via PlatformIO) | **5.3.x** for `esp32-c6-devkitc-1` |
 | PlatformIO espressif32 | **6.9.x** |

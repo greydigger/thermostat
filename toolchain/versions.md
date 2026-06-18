@@ -6,7 +6,7 @@ Pinned versions for reproducible builds across hardware and firmware workstreams
 
 | Tool | Version | Install |
 |------|---------|---------|
-| KiCad | **9.0** | [kicad.org/download](https://www.kicad.org/download/) |
+| KiCad | **10.0.3** | `toolchain/kicad-version.txt` · [kicad.org/download](https://www.kicad.org/download/) |
 
 ## Thermostat Firmware (ESPHome)
 
