@@ -1,0 +1,45 @@
+# Project-specific ignores for cmf-website
+
+# Grok / AI internal files
+AGENTS.md
+PLAN.md
+*.plan.md
+GROK.md
+
+# Deployment
+deploy.sh
+
+# Git
+.git
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Temporary / build files
+*.log
+*.tmp
+*.temp
+.cache
+.tmp/
+
+# If you ever add frontend build tools later
+node_modules/
+dist/
+build/
