@@ -1,16 +1,8 @@
-# Project-specific ignores for cmf-website
-
 # Grok / AI internal files
 AGENTS.md
 PLAN.md
 *.plan.md
 GROK.md
-
-# Deployment
-deploy.sh
-
-# Git
-.git
 
 # OS generated files
 .DS_Store
@@ -32,14 +24,41 @@ Thumbs.db
 *.sublime-workspace
 *.sublime-project
 
-# Temporary / build files
+# Logs and temp
 *.log
 *.tmp
 *.temp
-.cache
+.cache/
 .tmp/
 
-# If you ever add frontend build tools later
+# ESPHome secrets (use secrets.yaml.example as template)
+thermostat/firmware/secrets.yaml
+
+# ESPHome / ESP-IDF build artifacts
+.esphome/
+.pio/
+.pioenvs/
+.piolibdeps/
+build/
+*.bin
+*.elf
+*.map
+
+# KiCad
+*-backups/
+*-save.kicad_pcb
+*-save.kicad_sch
+fp-info-cache
+*.kicad_prl
+*.lck
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Node (if used for tooling later)
 node_modules/
 dist/
-build/

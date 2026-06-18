@@ -1,0 +1,43 @@
+name: KiCad ERC/DRC
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  erc-drc:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/kicad/kicad:9.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find KiCad projects
+        id: projects
+        run: |
+          mapfile -t projects < <(find . -name '*.kicad_pro' -not -path './.git/*' | sort)
+          if [ ${#projects[@]} -eq 0 ]; then
+            echo "No KiCad projects found — skipping ERC/DRC (expected until PR 3+)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "${projects[@]}" > /tmp/kicad_projects.txt
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run ERC
+        if: steps.projects.outputs.skip != 'true'
+        run: |
+          while IFS= read -r project; do
+            echo "ERC: $project"
+            kicad-cli sch erc "$project"
+          done < /tmp/kicad_projects.txt
+
+      - name: Run DRC
+        if: steps.projects.outputs.skip != 'true'
+        run: |
+          while IFS= read -r project; do
+            echo "DRC: $project"
+            kicad-cli pcb drc "$project"
+          done < /tmp/kicad_projects.txt

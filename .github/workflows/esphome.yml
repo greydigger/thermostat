@@ -1,0 +1,33 @@
+name: ESPHome compile_only
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read ESPHome version pin
+        id: pin
+        run: echo "version=$(cat toolchain/esphome-version.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ESPHome
+        run: pip install "esphome==${{ steps.pin.outputs.version }}"
+
+      - name: Create CI secrets
+        run: cp thermostat/firmware/secrets.yaml.example thermostat/firmware/secrets.yaml
+
+      - name: Validate config
+        run: esphome config thermostat/firmware/thermostat-zone.yaml
+
+      - name: Compile (no hardware)
+        run: esphome compile thermostat/firmware/thermostat-zone.yaml
