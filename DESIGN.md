@@ -1,4 +1,4 @@
-# Battery-Assisted Smart Hydronic Zone Thermostat System
+# Bus-Powered Smart Hydronic Zone Thermostat System
 
 | Field | Value |
 |-------|-------|
@@ -12,11 +12,11 @@
 
 ## Overview
 
-This document specifies a two-board hydronic heating control system for an 8-zone residential installation. A **Central Power & Relay Board** in the boiler room sources 12 V DC on each zone's existing 2-wire (R/W) thermostat cable, detects per-zone heat calls via a superimposed ~100 kHz on-off keying (OOK) tone, and drives dry-contact relays into the legacy boiler control. Each **Per-Zone Smart Thermostat** provides local UI, WiFi connectivity via ESPHome, and schedule/setpoint management while preserving **fail-safe heat control** through a split-brain architecture: an MCP9808 temperature sensor and discrete tone-generation hardware operate independently of the ESP32-C6.
+This document specifies a two-board hydronic heating control system for a **6-zone** residential installation. A **Central Power & Relay Board** in the boiler room sources 12 V DC on each zone's existing 2-wire (R/W) thermostat cable, detects per-zone heat calls via a superimposed ~100 kHz on-off keying (OOK) tone using a **central MCU and ADC-based I/Q amplitude detector**, and drives dry-contact relays into the legacy boiler control. Each **Per-Zone Smart Thermostat** provides local UI, WiFi connectivity via ESPHome, and schedule/setpoint management while preserving **fail-safe heat control** through a split-brain architecture: an MCP9808 temperature sensor and discrete tone-generation hardware operate independently of the ESP32-C6.
 
-The thermostat draws primary power from the 2-wire bus and uses a single LiFePO4 18650 cell for backup and peak assist. Heat calls are encoded as a continuous HF tone on the same pair used for DC power; loss of tone causes the central board to release the zone relay (fail-safe off). Smart features (display, proximity wake, Home Assistant integration, OTA) run on the ESP32 but cannot block or falsely assert a heat call.
+The thermostat draws **all power from the 2-wire bus** in v1 (no on-board battery). Heat calls are encoded as a continuous HF tone on the same pair used for DC power; loss of tone causes the central board to release the zone relay (fail-safe off). Smart features (display, proximity wake, Home Assistant integration, OTA) run on the ESP32 but cannot block or falsely assert a heat call.
 
-**Bench-validation gate:** No 8-zone or thermostat PCB Gerber order until PR 2b go/no-go criteria pass (see PR Plan).
+**Bench-validation gate:** No 6-zone or thermostat PCB Gerber order until PR 2b go/no-go criteria pass (see PR Plan).
 
 ---
 
@@ -24,7 +24,7 @@ The thermostat draws primary power from the 2-wire bus and uses a single LiFePO4
 
 ### Current State
 
-- Hydronic multi-zone system with **8 zones**, heat-only.
+- Hydronic multi-zone system with **6 zones**, heat-only.
 - Each zone uses **2-wire thermostat cable** (20/2), max run **60 ft** to a centralized control box.
 - Legacy thermostats: dry-contact closure on R/W at ~5 V DC intended; W returns to central control that operates zone valves and boiler interlock.
 - Multi-zone coordination (boiler min runtime, pump logic) is handled by **existing boiler control** — out of scope.
@@ -44,7 +44,7 @@ The thermostat draws primary power from the 2-wire bus and uses a single LiFePO4
 
 1. **2-wire bus with DC + HF tone** reuses installed cable and matches the electrical model of dry-contact stats (closure = call for heat), but encodes "closure" as continuous tone presence.
 2. **MCP9808 ALERT → latch → oscillator** path ensures the ESP32 is not in the critical heat-call chain.
-3. **LiFePO4 backup** covers brief bus outages and supplies peak current for WiFi/display without sagging logic rails.
+3. **Bus-only power in v1** simplifies the thermostat; the 12 V central supply must be reliable (battery backup deferred to a future revision).
 4. **ESPHome + Home Assistant** matches the user's existing home automation stack.
 
 ---
@@ -56,13 +56,13 @@ The thermostat draws primary power from the 2-wire bus and uses a single LiFePO4
 | ID | Goal | Success Metric |
 |----|------|----------------|
 | G1 | Fail-safe heat control independent of ESP32 | Heat call path functions with ESP32 unpowered or held in reset |
-| G2 | 8-zone support over 60 ft 20/2 cable | Reliable tone detect/decode at worst-case attenuation (validated in PR 2b) |
-| G3 | 12 V DC bus power per zone | Thermostat operates from bus; battery is assist/backup only |
+| G2 | 6-zone support over 60 ft 20/2 cable | Reliable tone detect/decode at worst-case attenuation (validated in PR 2b) |
+| G3 | 12 V DC bus power per zone | Thermostat operates entirely from bus in v1 (no local battery) |
 | G4 | Dry-contact output per zone to legacy control | Compatible with existing ~5 V DC sensing inputs |
 | G5 | Day/night schedule + manual hold | 2 transitions/24 h when ESP32 is online **with valid time (SNTP or HA sync)** |
 | G6 | Local UI: round touch display + proximity wake | Responsive touch; display off when idle |
 | G7 | HA integration + HomeKit via HA bridge | State, setpoints, alerts visible in HA |
-| G8 | Hydronic-appropriate cycling | Min on/off ~10 min enforced in hardware latch |
+| G8 | Thermostat anti-chatter | Min on/off **15–30 s** enforced in hardware (central boiler control handles valve/boiler minimums) |
 | G9 | OTA firmware updates | ESPHome OTA in scheduled window (LAN + password) |
 | G10 | Physical OFF switch | Fully disables heat call and tone driver |
 
@@ -73,7 +73,8 @@ The thermostat draws primary power from the 2-wire bus and uses a single LiFePO4
 - Floor/slab overtemperature protection (boiler handles this)
 - Boiler sequencing, outdoor reset, or zone valve motor drive (existing control)
 - Cloud dependency for heat control
-- USB field access or battery swapping without opening enclosure
+- On-board battery backup (deferred to v2)
+- USB field access without opening enclosure
 - Thread/Matter in v1 (planned later)
 - Per-room remote temperature sensors
 
@@ -88,28 +89,24 @@ flowchart TB
     subgraph BoilerRoom["Boiler Room — Central Power & Relay Board"]
         PSU["3 A @ 12 V DC Input PSU"]
         ZPSU["Per-Zone 12 V Feed + 150 mA Limit"]
-        DET["HF Bandpass + Envelope Detector ×8"]
-        RELAY["Mechanical Dry Contact Relay ×8"]
-        MCU_C["Optional: Central Monitor MCU (DNP v1)"]
+        MCU_C["Central MCU + ADC I/Q Detector (6 ch)"]
+        RELAY["Mechanical Dry Contact Relay ×6"]
         PSU --> ZPSU
-        ZPSU --> DET
-        DET --> RELAY
-        DET -.-> MCU_C
+        ZPSU --> MCU_C
+        MCU_C --> RELAY
     end
 
     subgraph ZoneN["Per Zone — Smart Thermostat"]
         BUS["2-Wire R/W Interface"]
-        PWR["Power Manager: Buck + Buck-Boost"]
+        PWR["Power Manager: Buck 12 V → 3.3 V"]
         MCP["MCP9808"]
-        LATCH["74HC4538 + CD4060 Min On/Off"]
+        LATCH["74HC4538 Anti-Chatter 15–30 s"]
         OSC["100 kHz Sine OOK Driver"]
         ESP["ESP32-C6 + ESPHome"]
-        UI["Display + Touch + Proximity"]
-        BAT["LiFePO4 18650 + NTC"]
+        UI["Round Display + External Rotary Knob"]
         OFF["DPST OFF Switch"]
 
         BUS --> PWR
-        BAT --> PWR
         PWR --> MCP & ESP & UI
         MCP -->|ALERT active-low| LATCH
         LATCH --> OSC
@@ -129,7 +126,7 @@ flowchart TB
 ```mermaid
 sequenceDiagram
     participant Temp as MCP9808
-    participant Latch as Min On/Off Latch
+    participant Latch as Anti-Chatter Latch
     participant OSC as 100 kHz Driver
     participant Bus as 2-Wire Bus
     participant Cent as Central Detector
@@ -140,7 +137,7 @@ sequenceDiagram
         Temp->>Latch: ALERT pin pulls LOW
         Latch->>OSC: Enable tone (if min-off elapsed)
         OSC->>Bus: Superimpose 100 kHz OOK (continuous)
-        Cent->>Cent: Envelope > threshold
+        Cent->>Cent: I/Q amplitude > threshold
         Cent->>RLY: Close dry contact (heat on)
     else T_LOWER - THYST <= T <= T_UPPER (comfort band)
         Temp->>Latch: ALERT releases HIGH
@@ -166,19 +163,19 @@ flowchart LR
     IN["12–18 V DC In (3 A)"] --> FUSE["5 A Input Fuse"]
     FUSE --> REG["12 V Zone Bus Regulator (2 A+)"]
     REG --> Z1["Zone 1 Feed"]
-    REG --> Z8["Zone 8 Feed"]
+    REG --> Z6["Zone 6 Feed"]
 
-    subgraph ZoneChannel["Per-Zone Channel (×8)"]
+    subgraph ZoneChannel["Per-Zone Analog Front-End (×6)"]
         LIM["Polyfuse 150 mA"]
         L["Feed Inductor 1.0 mH nom."]
         C["Coupling Cap 100 nF"]
-        BP["Bandpass ~100 kHz"]
-        ENV["Envelope Detector τ=2 ms"]
-        CMP["Comparator + Debounce 1 s"]
-        R["SPST Mechanical Relay"]
-        LIM --> L --> C
-        C --> BP --> ENV --> CMP --> R
+        ATT["Attenuator + Clamp"]
+        MUX["6:1 Analog Mux → ADC"]
+        LIM --> L --> C --> ATT --> MUX
     end
+
+    MUX --> MCU["Central MCU I/Q Detector"]
+    MCU --> R["SPST Relay ×6"]
 ```
 
 #### Electrical Parameters
@@ -213,31 +210,62 @@ Bench measurements in PR 2b shall override these estimates for detector threshol
 
 #### Central PSU Sizing
 
-| Load | Per-Unit | ×8 Zones | Notes |
+| Load | Per-Unit | ×6 Zones | Notes |
 |------|----------|----------|-------|
-| Thermostat steady + tone | 50–150 mA | 0.4–1.2 A | Polyfuse per zone; all zones may draw concurrently |
-| Relay coil (Omron G5LE class) | 30–40 mA | 0.24–0.32 A | All relays may be energized simultaneously |
-| Regulator + detector overhead | — | 0.1 A | Central board quiescent |
-| **Max steady total** | — | **~1.6 A** | Design target |
-| Inrush / headroom (×1.5) | — | **~2.4 A** | — |
-| **Selected PSU** | — | **3 A @ 12 V** | 36 W; 5 A fuse |
+| Thermostat steady + tone | 50–150 mA | 0.3–0.9 A | Polyfuse per zone; all zones may draw concurrently |
+| Relay coil (Omron G5LE class) | 30–40 mA | 0.18–0.24 A | All relays may be energized simultaneously |
+| Regulator + central MCU overhead | — | 0.15 A | Central board quiescent + ADC DMA bursts |
+| **Max steady total** | — | **~1.3 A** | Design target |
+| Inrush / headroom (×1.5) | — | **~2.0 A** | — |
+| **Selected PSU** | — | **3 A @ 12 V** | 36 W; 5 A fuse (headroom for 6 zones) |
 
 **Current limiting strategy:** Per-zone **150 mA polyfuse** only (no global zone budget limiter). A single shorted zone trips its polyfuse without affecting others. Global 5 A input fuse protects PSU and wiring.
 
 **Thermal:** 12 V regulator dissipation worst case: `(18 V − 12 V) × 1.6 A ≈ 9.6 W` — requires heatsink on input regulator if 18 V supply is used.
 
-#### Tone Detection
+#### Tone Detection — MCU + ADC I/Q Amplitude Detector (v1, Required)
 
-Each zone channel:
+A **central MCU with ADC** (e.g., STM32G071 class, 12-bit, ≥1 Msps) replaces discrete envelope comparators. Six zone channels share one ADC input via an **analog multiplexer**. Firmware implements a lightweight **multi-channel 100 kHz sine amplitude detector**.
 
-1. **Feed inductor:** **1.0 mH nominal** (acceptable range **470 µH–2.2 mH** per bench tuning in PR 2b).
-2. **Series capacitor:** 100 nF ceramic — couples tone, blocks DC.
-3. **Bandpass filter:** centered at 100 kHz (2nd-order LC or active, Q ≈ 5–10).
-4. **Envelope detector:** diode + RC, **τ ≈ 2 ms**.
-5. **Comparator** with hysteresis; threshold set above idle noise floor (from PR 2b measurements).
-6. **Output debounce:** **1 s** nominal (acceptable range 500 ms–2 s).
+##### Sampling Strategy (Time-Multiplexed)
 
-**Optional DNP footprints (v2 / optional MCU):** relay auxiliary contact input, envelope ADC tap, per-zone shunt for RMS — populate only if central MCU is installed.
+| Parameter | Value |
+|-----------|-------|
+| Channels | 6 (one per zone) |
+| Per-channel sample rate | **80 kHz** (12.5 µs period) |
+| Burst duration | **5–10 ms** (400–800 samples per channel) |
+| Full scan period | **60 ms** (all 6 channels) |
+| Tone frequency | **100 kHz** nominal |
+
+**Intentional undersampling:** Sampling at 80 kHz aliases the 100 kHz tone to **20 kHz** (|100 − 80| = 20 kHz beat). This is by design — the detector tracks amplitude of the aliased component, not the raw RF carrier.
+
+##### I/Q Demodulation (Per Burst)
+
+On the aliased ~20 kHz signal, apply a **quadrature demodulator** with **0/±1 coefficients** (no multipliers — sign flips only):
+
+```text
+I += sample × cos_ref[n]   # cos_ref ∈ {+1, 0, -1, 0} at 20 kHz effective rate
+Q += sample × sin_ref[n]   # sin_ref ∈ {0, +1, 0, -1}
+amplitude_proxy = I² + Q²    # no sqrt required
+```
+
+Accumulate I and Q over each burst; compare `amplitude_proxy` to a per-channel threshold (calibrated in PR 2b). Target: **±10% amplitude accuracy** with **±0.1% tone frequency offset** (100 kHz ±100 Hz).
+
+##### CPU / DMA
+
+- **ADC continuous mode + DMA** circular buffer — minimal CPU during acquisition.
+- Demodulation runs as a **background task** between bursts; target **<<10% CPU load** on central MCU.
+- Output: per-channel **`signal_present[N]`** boolean flags, updated every 60 ms scan.
+- Relay logic: flag TRUE → close dry contact (after **~1 s** output debounce); flag FALSE → open relay (fail-safe off).
+
+##### Analog Front-End (Per Zone)
+
+1. **Feed inductor:** **1.0 mH nominal** (470 µH–2.2 mH range per bench tuning).
+2. **AC coupling:** 100 nF ceramic — blocks DC bus voltage from ADC mux.
+3. **Attenuator / clamp:** Resistive divider + TVS to keep ADC input within 0–3.3 V.
+4. **Mux input:** Six channels → ADG708 or equivalent → single MCU ADC pin.
+
+**Optional v2:** relay auxiliary contact feedback, per-zone RMS logging to HA.
 
 #### Timing Budget (End-to-End Heat Call)
 
@@ -246,17 +274,17 @@ Technicians debugging zone demand must understand layered timing at thermostat v
 | Stage | Location | Nominal | Range | Notes |
 |-------|----------|---------|-------|-------|
 | MCP9808 compare + ALERT assert | Thermostat | <100 ms | — | Hardware comparator |
-| Min-off gate blocks latch SET | Thermostat | 0–10 min | ±10% | CD4060 + 74HC4538 |
+| Min-off gate blocks latch SET | Thermostat | 0–30 s | ±10% | 74HC4538 monostable |
 | Latch SET → tone enable | Thermostat | <1 ms | — | `TONE_EN` pull-up, default-off |
 | Oscillator startup | Thermostat | 1–5 ms | — | Sine oscillator settle |
-| Envelope detector rise | Central | ~5 ms | 2τ | τ = 2 ms |
-| Central debounce | Central | 1 s | 0.5–2 s | Fast vs. latch — **central responds to tone edges, not 10 min latch** |
+| Central I/Q detect + scan | Central | ≤60 ms | — | Full 6-channel round-robin |
+| Central debounce | Central | 1 s | 0.5–2 s | Applied to `signal_present` flag |
 | Relay pull-in | Central | 5–15 ms | — | Mechanical relay |
-| **Heat-call assert (cold → relay close)** | End-to-end | **~1 s** after tone present | If min-off elapsed | Dominated by central debounce |
+| **Heat-call assert (cold → relay close)** | End-to-end | **~1–2 s** after tone present | If min-off elapsed | Dominated by central debounce |
 | **Heat-call release (warm → relay open)** | End-to-end | **~1 s** after tone stops | If min-on elapsed | Tone stop is immediate; relay opens ~1 s later |
-| Min-on hold (thermostat) | Thermostat | 10 min | 9–11 min | ALERT may deassert; tone continues until min-on expires |
+| Min-on hold (thermostat) | Thermostat | **15–30 s** | ±10% | ALERT may deassert; tone continues until min-on expires |
 
-**Key insight:** The 10 min min on/off latch runs **only at the thermostat**. The central board debounce (~1 s) is independent and much faster. During min-on hold with ALERT deasserted, tone continues → central relay stays closed. During min-off hold with ALERT asserted, tone is off → central relay stays open.
+**Key insight:** The **15–30 s** anti-chatter latch runs **only at the thermostat** to prevent rapid tone cycling. The **central boiler control** enforces valve and boiler minimum runtimes. Central I/Q detection (~60 ms scan) plus ~1 s output debounce is independent of thermostat latch timing.
 
 #### Protection
 
@@ -265,18 +293,20 @@ Technicians debugging zone demand must understand layered timing at thermostat v
 - Relay flyback diodes.
 - ESD on field wiring terminals.
 
-#### Optional Central MCU (v2 Telemetry)
+#### Central MCU Firmware (Required v1)
 
-An ESP32 on the central board is **optional and DNP for v1**. Relay drive is entirely analog from envelope detectors — **no firmware required for heat operation**.
+The central MCU is **required for v1** — relay drive depends on `signal_present[]` flags from the I/Q detector.
 
-If populated (v2), MCU adds:
+**Responsibilities:**
 
-- Per-zone demand binary sensors (comparator output tap)
-- `zone_N_relay_state` via auxiliary contact inputs (DNP footprints)
+- Time-multiplexed ADC acquisition (DMA) and I/Q demodulation per channel
+- Maintain `signal_present[0..5]` booleans (TRUE = tone amplitude above threshold)
+- Drive relay GPIOs with **~1 s** output debounce
+- Optional: publish zone demand via UART/CAN to a future HA bridge (v2)
 
-**Deferred to v2** (require optional HW): `zone_N_tone_rms`, stuck-relay detection, heartbeat logging.
+**Planned path:** `central-board/firmware/` (STM32 HAL or Arduino framework — selected in PR 3)
 
-Planned path: `central-board/firmware/central-zone-monitor.yaml`
+**v2 additions:** `zone_N_tone_amplitude`, stuck-relay detection via auxiliary contacts, heartbeat logging.
 
 ---
 
@@ -289,7 +319,7 @@ Planned path: `central-board/firmware/central-zone-monitor.yaml`
 | Temperature measurement | MCP9808 (I2C) | None |
 | Setpoint compare + hysteresis | MCP9808 internal | None |
 | Heat call decision | MCP9808 ALERT (open-drain, active low) | None |
-| Min on/off enforcement | 74HC4538 + CD4060 + SR latch | None |
+| Anti-chatter (15–30 s min on/off) | 74HC4538 dual monostable + SR latch | None |
 | 100 kHz tone generation | Sine oscillator + FET bus driver | **Primary from 12 V bus** |
 | Display, touch, proximity | GC9A01/ST7789 + CST816S + VCNL4040 | 3.3 V rail |
 | WiFi, OTA, schedule | ESP32-C6 ESPHome | 3.3 V rail |
@@ -442,26 +472,20 @@ OFF DOES remove:
 
 Schematic: `thermostat/hw/sheets/off-switch.kicad_sch` — ERC checklist requires sense net independent of cut net.
 
-#### Min On/Off Latch (Hydronic Cycling) — 74HC4538 + CD4060
+#### Anti-Chatter Latch (15–30 s Min On/Off) — 74HC4538
 
-**Decision (resolved — formerly OQ2):** Use **74HC4538 dual monostable + CD4060 14-bit counter + SR latch**. Reject 555 for 10 min timing (leakage/tolerance unacceptable).
+**Decision (revised):** Use **74HC4538 dual monostable + SR latch** only. **No CD4060** — the existing central boiler control enforces valve/boiler minimum runtimes; the thermostat needs only **15–30 s** anti-chatter.
 
-**Timing (corrected):** CD4060 output `Qn` toggles at period **`T = 2^n / f_osc`**. Target **600 s (10 min)** at **Q10** (n=10):
+**Timing:** 74HC4538 monostable period **`T ≈ 0.45 × R × C`**. Target **20 s** (mid-range):
 
 ```text
-f_osc = 2^n / T = 2^10 / 600 = 1024 / 600 ≈ 1.71 Hz
+For T = 20 s: R × C ≈ 44.4 s
+Example: R = 4.7 MΩ, C = 10 nF → T ≈ 21 s
 
-CD4060 oscillator (datasheet):  f_osc ≈ 1 / (2.2 × R × C)
-
-Example: R = 100 kΩ, C = 2.7 nF
-  f_osc ≈ 1 / (2.2 × 100e3 × 2.7e-9) ≈ 1.68 Hz
-  T_Q10 = 2^10 / 1.68 ≈ 609 s ≈ 10.2 min  (within ±10%)
-
-Use Q10 (pin 13) for both min-on and min-off one-shots (74HC4538 triggered by Q10 edge).
-Trim R on bench to achieve 540–660 s (9–11 min) at 25 °C ambient.
+Trim R on bench to achieve 15–30 s at 25 °C ambient.
 ```
 
-**PR 6 bench procedure:** Measure Q10 period with scope; record R/C; verify ±10% across 10–35 °C ambient.
+**PR 6 bench procedure:** Measure monostable period with scope; record R/C; verify 15–30 s range.
 
 **Default-safe:** `TONE_EN` held **low** via 10 kΩ pull-down. Latch output is **open-collector / active-high enable** — failure modes default to tone off.
 
@@ -488,7 +512,7 @@ Trim R on bench to achieve 540–660 s (9–11 min) at 25 °C ambient.
 |---------|--------|-----------|------------|
 | Latch stuck ON | Continuous tone → continuous heat | Central: heat call > 4 h alert; tone present with T > setpoint | `TONE_EN` default-off pull-down; power-on CLEAR |
 | Latch stuck OFF | No heat | Room cold; ALERT low but no tone | User OFF/reboot; bench test in PR 6 |
-| Timer drift | Shortened/longer cycles | Log duty cycle in HA | CD4060 trim on bench; ±10% acceptable |
+| Timer drift | Shortened/longer cycles | Log duty cycle in HA | 74HC4538 R/C trim on bench; ±10% acceptable |
 
 **PR 6 deliverable:** `bench/latch-timing/test-procedure.md` — validate all state-machine rows on breadboard before PCB layout.
 
@@ -500,41 +524,22 @@ Trim R on bench to achieve 540–660 s (9–11 min) at 25 °C ambient.
 - **Amplitude target:** 200–500 mVpp at thermostat; central threshold << 50 mVpp after 60 ft attenuation (PR 2b measured).
 - **OOK:** Latch `TONE_EN` enables oscillator. Continuous tone while heating.
 
-#### Power Manager
+#### Power Manager (Bus-Only, v1)
 
 ```mermaid
 flowchart TB
     BUS12["12 V from 2-Wire Bus"] --> BUCK["Sync Buck → 3.3 V"]
-    CELL["LiFePO4 18650"] --> NTC["NTC 10 kΩ on cell"]
-    CELL --> CHG["Charger IC w/ NTC pin"]
-    BUS12 --> CHG
-    CHG --> CELL
-    CELL --> BB["Buck-Boost → 3.3 V"]
-    BUCK --> ORING["Ideal Diode OR"]
-    BB --> ORING
-    ORING --> R33["3.3 V System Rail"]
+    BUCK --> R33["3.3 V System Rail"]
     R33 --> ESP & MCP & DISP
     BUS12 --> TONEPWR["Tone Driver 12 V Rail"]
 ```
 
 | Rail | Source | Load Budget |
 |------|--------|-------------|
-| 3.3 V logic | Buck (bus) OR buck-boost (cell) | ESP32-C6, MCP9808, display, touch |
+| 3.3 V logic | Buck from 12 V bus | ESP32-C6, MCP9808, display, touch, proximity |
 | 12 V tone | Bus only | ~5–15 mA |
-| LiFePO4 charge | Bus via charger IC | **100 mA default** (see below) |
 
-**Charger IC criteria (PR 5 BOM):**
-
-| Requirement | Selection |
-|-------------|-----------|
-| Chemistry | LiFePO4 (3.0–3.6 V) |
-| Charge current | **100 mA** (OQ7 resolved: preserves bus budget; 500 mA only if spare PSU headroom confirmed) |
-| NTC / JEITA | Required — **charge disable below 0 °C** |
-| CV voltage | **3.60–3.65 V** (LiFePO4 profile) |
-| Part class | **LiFePO4-specific only** — e.g., **TP5000** (3.6 V CV, resistor-set current) or **CN3791** (3.65 V, NTC pin). **Do not use MCP73831** (Li-ion 4.2 V) or BQ24074 (Li-ion) |
-| Ship behavior | No charge below 0 °C; ESP32 logs `battery_cold` sensor |
-
-**PR 5 BOM acceptance:** Charger datasheet must state LiFePO4 / 3.6 V CV compatibility.
+**v1 has no on-board battery.** If the 12 V bus fails, the thermostat loses power and cannot call for heat (fail-safe off at central board). Battery backup is deferred to v2.
 
 **Estimated average current (thermostat):**
 
@@ -546,26 +551,20 @@ flowchart TB
 | WiFi transmit peak | 250–350 mA peaks | 5–10 mA |
 | Heating (tone on, ESP32 asleep) | +0.5 mA | +10–20 mA |
 
-**Battery runtime (1500 mAh LiFePO4, bus failed):**
-
-| Scenario | Estimated Runtime |
-|----------|-------------------|
-| T0 deep sleep during heat (ESP32 off, tone from bus — **N/A if bus failed**) | If bus failed: **no heat** (KD16); battery supports MCP9808 + UI only |
-| T0 deep sleep, no heat, bus failed | **3–6 weeks** |
-| T3 heating + WiFi, display off, bus failed | **~2–4 days** (15–30 mA avg) |
-| T2 UI + WiFi active, bus failed | **~24–48 h** |
-
-**No direct cell → 3.3 V:** Buck-boost required for 2.5–3.65 V range.
-
 #### Display & UI
 
 | Item | Selection |
 |------|-----------|
-| Primary | 1.28" round 240×240 IPS, GC9A01 or ST7789, SPI |
-| Touch | CST816S or FT6336, I2C |
+| Primary | **1.28" round 240×240 IPS** with **external rotary knob** mounted around/outside the display bezel (ready-made module) |
+| Sourcing | Off-the-shelf modules from **AliExpress / Alibaba** (~$10–15); similar form factor to IoTeikXgo-style round knob displays |
+| Display driver | GC9A01 or ST7789, SPI |
+| Touch | CST816S or FT6336 on round panel, I2C |
+| Rotary input | Quadrature encoder integrated in knob ring (A/B + optional switch) → ESP32 GPIO |
 | Proximity | VCNL4040, I2C + INT pin |
-| Fallback | 2" color LCD (ILI9341 class) |
+| Fallback | 2" color LCD (ILI9341 class) without knob |
 | Physical control | DPST OFF switch only |
+
+**Knob placement:** The rotary control sits **outside** the round TFT (ring/knob assembly), not behind the glass. Prefer modules where encoder hardware is pre-mounted on the PCB rim.
 
 **Idle behavior:** Display off by default; proximity wake → active UI timeout 30–120 s.
 
@@ -586,7 +585,8 @@ ESP32-C6 **RTC-capable GPIOs:** GPIO0–7 (usable as `deep_sleep` wake sources).
 | `HEAT_CALL_SENSE` (latch out) | GPIO3 | **Yes** | Input | T3 tier detection |
 | `OFF_SENSE` (DPST pole B) | GPIO2 | **Yes** | Input | Pull-up; HIGH = user OFF |
 | `BUS_ADC` (12 V divider) | GPIO0 | **Yes** | ADC | Bus presence monitoring |
-| `BAT_ADC` (cell divider) | GPIO1 | **Yes** | ADC | Battery voltage |
+| Rotary encoder A | GPIO1 | **Yes** | Input | Quadrature knob (with pull-ups) |
+| Rotary encoder B | GPIO20 | No | Input | Quadrature knob |
 
 **Revised OFF_SENSE = GPIO2** (GPIO7 used for SPI MOSI).
 
@@ -674,14 +674,14 @@ thermostat/firmware/
 
 **Fail-safe rule:** Any condition that stops tone → relay opens → heat off.
 
-**Bus-fail behavior (KD16):** If central board loses power or bus is cut, **all zones stop calling for heat** (no tone → relays open). Thermostats continue local MCP9808 control but cannot reach boiler. User sees `bus_voltage = 0` in HA; battery sustains ESP32 for status only.
+**Bus-fail behavior (KD16):** If central board loses power or bus is cut, **all zones stop calling for heat** (no tone → relays open). Thermostats lose power in v1 (bus-only) and cannot assert tone. User sees `bus_voltage = 0` in HA when WiFi was last connected.
 
 #### Optional Heartbeat (v2)
 
 | Field | Value |
 |-------|-------|
 | Pattern | 50 ms tone burst every 30 s |
-| Relay impact | None (envelope hold-off > burst period) |
+| Relay impact | None (I/Q detector ignores sub-burst transients) |
 | Purpose | Wire integrity monitoring |
 
 ---
@@ -747,7 +747,7 @@ on_time:
 
 - User sets temp via touch UI → ESP32 writes MCP9808 limits immediately.
 - `hold_active` NVS flag persists until "Resume Schedule."
-- Hold does not bypass min on/off latch or OFF switch.
+- Hold does not bypass anti-chatter latch or OFF switch.
 
 ---
 
@@ -761,9 +761,7 @@ on_time:
 | `binary_sensor.heat_call` | Binary | R | `HEAT_CALL_SENSE` GPIO |
 | `binary_sensor.proximity` | Binary | R | Display wake events |
 | `binary_sensor.physical_off` | Binary | R | OFF switch sense (GPIO2); `true` = OFF position |
-| `sensor.battery_voltage` | Sensor | R | Cell voltage |
 | `sensor.bus_voltage` | Sensor | R | 12 V bus ADC |
-| `sensor.battery_cold` | Binary/Sensor | R | NTC cold-charge inhibit active |
 | `button.resume_schedule` | Button | W | Clears manual hold |
 | `text_sensor.firmware_version` | Text | R | OTA tracking |
 
@@ -818,13 +816,14 @@ ESPHome native MCP9808 is **temperature sensor only**. Custom `mcp9808_thermosta
 | `display_timeout_s` | int | 60 | — |
 | `timezone` | string | from secrets | SNTP TZ |
 
-### Central Board (optional MCU — v2 only)
+### Central Board MCU (required v1)
 
 | Key | Type | Version | Description |
 |-----|------|---------|-------------|
-| `zone_N_relay_state` | bool | v2 | Auxiliary contact |
-| `zone_N_tone_rms` | uint16 | **v2** | Requires ADC front-end |
-| `zone_N_last_heartbeat` | timestamp | **v2** | Requires heartbeat protocol |
+| `signal_present[N]` | bool | v1 | I/Q detector output per zone |
+| `zone_N_relay_state` | bool | v2 | Auxiliary contact feedback |
+| `zone_N_tone_amplitude` | uint32 | v2 | Raw I²+Q² proxy for telemetry |
+| `zone_N_last_heartbeat` | timestamp | v2 | Requires heartbeat protocol |
 
 ---
 
@@ -845,7 +844,7 @@ ESPHome native MCP9808 is **temperature sensor only**. Custom `mcp9808_thermosta
 | WiFi credential theft | Low | WPA3; secrets in `secrets.yaml` (gitignored) |
 | HA API exposure | Low | HA auth; local network only |
 | Bus short / miswire | Medium | Per-zone polyfuse; reverse polarity protection |
-| Battery overcharge / thermal | Medium | Charger IC with NTC; 0 °C charge inhibit |
+| Bus power loss | Medium | Central PSU monitoring; fail-safe relay open; v2 battery TBD |
 
 **OTA signing:** Not in v1 scope. ESPHome supports compile-time signing but DIY key management is not operationalized. v2 may add `!include signing.yaml` with offline key. v1 relies on **OTA password + LAN-only + scheduled window**.
 
@@ -870,8 +869,8 @@ ESPHome native MCP9808 is **temperature sensor only**. Custom `mcp9808_thermosta
 | F3 | ESP32 held in reset, **T = 95 °F** (below 125 °F safety ceiling) | **No heat call** |
 | F3b | ESP32 held in reset, **T > safety_upper_f (125 °F)** | ALERT asserts → heat call (expected comparator behavior; not a fail) |
 | F4 | OFF switch | Tone off; relay open; `physical_off` true |
-| F5 | 60 ft tone detect | Envelope > threshold with ≥ 3× margin |
-| F6 | 8-zone simultaneous tone (PR 2b EMI) | No false triggers on inactive channels |
+| F5 | 60 ft tone detect | I²+Q² proxy > threshold with ≥ 3× margin |
+| F6 | 6-zone simultaneous tone (PR 2b EMI) | No false triggers on inactive channels |
 
 ---
 
@@ -916,13 +915,13 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 | Risk | Severity | Likelihood | Mitigation |
 |------|----------|------------|------------|
 | Tone attenuation on 60 ft cable | High | Medium | PR 2b bench; adjustable threshold |
-| EMI — 8 concurrent 100 kHz tones | Medium | Medium | Sine oscillator; PR 2b 1-vs-8 coupling test; reposition cable runs if needed |
+| EMI — 6 concurrent 100 kHz tones | Medium | Medium | Sine oscillator; PR 2b 1-vs-6 coupling test; reposition cable runs if needed |
 | MCP9808 misconfigured alert mode | **Critical** | Low | T_UPPER=safety ceiling; Alert Cnt=1; F3 bench test |
 | MCP9808 I2C corruption during brownout | Medium | Low | Series resistors; MCP9808 holds limits without clock |
-| Min on/off latch stuck-on | High | Low | Default-off pull-down; FMEA; 4 h heat alert |
-| LiFePO4 cold charge | Medium | Medium | NTC on charger; `battery_cold` entity |
+| Anti-chatter latch stuck-on | High | Low | Default-off pull-down; FMEA; 4 h heat alert |
 | ESP32 deep sleep wake failure | Medium | Medium | EXT1 on RTC pins; light-sleep fallback |
-| False heat call from noise | High | Low | Bandpass + 1 s debounce + continuous tone |
+| False heat call from noise | High | Low | I/Q threshold + 1 s debounce + continuous tone |
+| Central MCU firmware hang | Medium | Low | Watchdog; relays open if `signal_present` stale >5 s |
 
 ---
 
@@ -931,12 +930,12 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 | # | Question | Status | Owner |
 |---|----------|--------|-------|
 | OQ1 | Legacy control input voltage/current | Open | User / Phase 0 measure |
-| OQ2 | Latch technology | **Resolved: 74HC4538 + CD4060** | HW |
+| OQ2 | Latch technology | **Resolved: 74HC4538 only (15–30 s)** | HW |
 | OQ3 | Heartbeat on bus | **Deferred to v2** | Design |
 | OQ4 | GC9A01 vs ST7789 | Open | FW / PR 11 |
-| OQ5 | Central MCU | **DNP for v1** | HW |
+| OQ5 | Central MCU | **Required v1** (STM32G071 class + I/Q detector) | HW |
 | OQ6 | Display during heating | **Resolved: off unless proximity** | UX |
-| OQ7 | Charge current | **Resolved: 100 mA default** | HW |
+| OQ7 | Battery backup | **Deferred to v2** (bus-only v1) | HW |
 
 ---
 
@@ -957,11 +956,11 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 |---|----------|-----------|--------------|
 | KD1 | Split-brain: MCP9808 + latch → tone; ESP32 non-critical | G1 fail-safe | F2, F3 |
 | KD2 | 12 V DC + 100 kHz OOK on 2-wire | Reuse cable | PR 2b |
-| KD3 | Tone driver from bus, not battery | Heat call survives cell loss | Bench |
-| KD4 | 74HC4538 + CD4060 min on/off (~10 min) | Hydronic cycling; reject 555 | PR 6 bench |
-| KD5 | LiFePO4 + buck-boost OR-ing | WiFi peak support | PR 8b |
+| KD3 | Tone driver from bus only (v1) | No battery in heat path | Bench |
+| KD4 | 74HC4538 anti-chatter (15–30 s) | Thermostat-only; boiler handles long mins | PR 6 bench |
+| KD5 | Bus-only power v1 (no battery) | Simpler v1; battery deferred | PR 5 |
 | KD6 | SNTP primary; HA time optional | G5 without HA | PR 12 test |
-| KD7 | Central v1: analog only; MCU DNP | No boiler-room firmware dependency | PR 4b |
+| KD7 | Central MCU + ADC I/Q detector (required v1) | 6-ch tone detect; <<10% CPU | PR 3, PR 13 |
 | KD8 | Day/night 2-transition schedule | Simple v1 | PR 12 |
 | KD9 | DPST OFF: pole A cuts enable, pole B senses | Resolves cut vs. sense | F4 |
 | KD10 | No bidirectional bus in v1 | Analog simplicity | — |
@@ -970,11 +969,12 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 | KD13 | MCP9808 comparator + T_UPPER safety ceiling (125 °F) + Alert Cnt=1 | Prevents over-temp heat call at 95 °F | **F3** |
 | KD14 | 100 kHz tone (not 30 kHz–1 MHz tunable) | Balance attenuation vs. EMI | PR 2b |
 | KD15 | Sine oscillator (not square) | Lower harmonics / AM interference | PR 2b EMI |
-| KD16 | Bus failure → all heat calls off | Fail-safe; battery = status only | F1, runbook |
+| KD16 | Bus failure → all heat calls off | Fail-safe; no local battery in v1 | F1, runbook |
 | KD17 | Mechanical relay (not SSR) | Legacy dry-contact compatibility | OQ1 confirm |
-| KD18 | 100 mA LiFePO4 charge + NTC 0 °C inhibit | Bus budget + cold wall safety | PR 5 |
-| KD19 | T3 heating: WiFi on, display off | Battery life; OQ6 resolved | PR 11 |
-| KD20 | PR 2b gate before Gerber release | Avoid 8-zone re-spin | Phase 0 |
+| KD18 | 80 kHz undersample → 20 kHz I/Q demod | Lightweight 6-ch amplitude detect | PR 2b, PR 13 |
+| KD19 | T3 heating: WiFi on, display off | Bus power budget; OQ6 resolved | PR 11 |
+| KD20 | PR 2b gate before Gerber release | Avoid 6-zone re-spin | Phase 0 |
+| KD21 | External rotary knob module (AliExpress) | Off-the-shelf round UI | PR 7, PR 11 |
 
 ---
 
@@ -1029,11 +1029,11 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 
 | Criterion | Pass |
 |-----------|------|
-| Tone detected at 60 ft | Envelope ≥ 3× comparator threshold |
+| Tone detected at 60 ft | I²+Q² proxy ≥ 3× noise-floor threshold |
 | Fail-safe release | Tone stop → relay open < 2 s |
 | False trigger (ESP32 in reset) | 0 false heat calls in 1 h noise test |
 | MCP9808 F3 | No heat at 95 °F with comfort T_LOWER and T_UPPER=125 °F safety ceiling |
-| EMI 8-zone | No cross-talk false triggers on idle channels |
+| EMI 6-zone | No cross-talk false triggers on idle channels |
 
 **Parallel OK:** PR 9–12 firmware may proceed; **no fab order** until signed off.
 
@@ -1051,9 +1051,9 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 
 ---
 
-### PR 4: Central Board — 8-Zone PCB Layout
+### PR 4: Central Board — 6-Zone PCB Layout
 
-**Title:** `feat(central-board): 8-zone PCB layout`
+**Title:** `feat(central-board): 6-zone PCB layout`
 
 **Files:** `central-board/hw/central-board.kicad_pcb`
 
@@ -1075,23 +1075,23 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 
 ---
 
-### PR 5: Thermostat — Power Manager & Battery
+### PR 5: Thermostat — Power Manager (Bus-Only)
 
-**Title:** `feat(thermostat): power path with charger, NTC, buck-boost`
+**Title:** `feat(thermostat): 12 V buck to 3.3 V power path`
 
-**Files:** `thermostat/hw/sheets/power-manager.kicad_sch`, `battery.kicad_sch`, `bus-interface.kicad_sch`
+**Files:** `thermostat/hw/sheets/power-manager.kicad_sch`, `bus-interface.kicad_sch`
 
 **Dependencies:** PR 2
 
-**Acceptance:** Charger with NTC; 100 mA charge; 0 °C inhibit documented in BOM
+**Acceptance:** 3.3 V buck from bus; no battery/charger footprints in v1 BOM
 
 ---
 
 ### PR 6: Thermostat — Split-Brain Control Path
 
-**Title:** `feat(thermostat): MCP9808, 74HC4538/CD4060 latch, sine tone, DPST OFF`
+**Title:** `feat(thermostat): MCP9808, 74HC4538 anti-chatter latch, sine tone, DPST OFF`
 
-**Files:** `control-path.kicad_sch`, `min-on-off-latch.kicad_sch`, `tone-driver.kicad_sch`, `off-switch.kicad_sch`, `bench/latch-timing/`
+**Files:** `control-path.kicad_sch`, `anti-chatter-latch.kicad_sch`, `tone-driver.kicad_sch`, `off-switch.kicad_sch`, `bench/latch-timing/`
 
 **Dependencies:** PR 5
 
@@ -1179,13 +1179,15 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 
 ---
 
-### PR 13: Central Board — Optional Monitor Firmware (v2)
+### PR 13: Central Board — I/Q Tone Detector Firmware (Required)
 
-**Title:** `feat(central-board): optional zone monitor (DNP HW)`
+**Title:** `feat(central-board): ADC DMA I/Q detector + relay driver`
 
-**Dependencies:** **PR 4 only**
+**Files:** `central-board/firmware/`, `docs/iq-detector-algorithm.md`
 
-**Description:** Firmware for optional MCU; reads comparator taps. Not required for relay operation.
+**Dependencies:** **PR 3, PR 2b**
+
+**Description:** Implement 6-channel time-multiplexed I/Q demodulator; `signal_present[]` flags; relay GPIO with debounce. Target <<10% CPU. Required for heat operation.
 
 ---
 
