@@ -53,6 +53,6 @@ kicad-cli pcb drc central-board/hw/central-board.kicad_pro    # when added
 
 | Phase | Status |
 |-------|--------|
-| PR 1 — Scaffold & tooling | In progress |
-| PR 2 — Bench harness | Not started |
+| PR 1 — Scaffold & tooling | Complete |
+| PR 2 — Bench harness | In progress |
 | PR 2b — Go/no-go gate | Blocks PCB fab |

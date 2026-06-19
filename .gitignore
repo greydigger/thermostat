@@ -1,3 +1,6 @@
+# Local SSH public key copy (not for repo)
+toolchain/github-ssh-key.pub
+
 # Grok / AI internal files
 AGENTS.md
 PLAN.md
