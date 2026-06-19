@@ -26,8 +26,9 @@ Cables bundled parallel ≥30 ft (tape together)
 
 ## Measurement — scope path (default)
 
-- One **passive AFE + scope CH** per channel (or mux + single scope sequentially).
-- Record **AC Vpp** at each idle channel's AFE output.
+- **Six full central AFE networks** (each with `L_feed` + `C_ac` + `R_div`) — required for valid crosstalk; see [impedance-model.md](../tone-attenuation/impedance-model.md).
+- **Six far-end driver emulators + load** (one per cable) when any channel is active.
+- Record **AC Vpp** at each idle channel's **divider output** (not raw bus).
 - **SA/FFT:** 100 kHz peak on idle channels should stay **< ⅓** of weakest active-channel `signal_Vpp` from S3 (equivalent to 3× detect margin).
 
 ## Tone sources

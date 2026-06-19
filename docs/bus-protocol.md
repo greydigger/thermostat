@@ -148,7 +148,7 @@ Compare `amplitude_proxy` to a per-channel threshold (calibrated in PR 2b). Pass
 
 ## Bench Validation Mapping
 
-Phase 0 lab work validates **physical plant**: tone attenuation and inter-channel crosstalk. Detector I/Q firmware may be proven separately (PR 13); bench default uses **scope Vpp** at the central AFE output.
+Phase 0 lab work validates **physical plant**: tone attenuation and inter-channel crosstalk at **100 kHz**, with **production-representative source and termination impedance** ([impedance-model.md](../bench/tone-attenuation/impedance-model.md)). Detector I/Q firmware may be proven separately (PR 13); bench default uses **scope Vpp** at the central AFE divider output.
 
 | Test | Protocol requirement | Bench evidence (default) | Bench doc |
 |------|---------------------|--------------------------|-----------|

@@ -7,6 +7,7 @@ Phase 0 lab work focuses on **physical plant** measurements: tone attenuation an
 | Artifact | Purpose |
 |----------|---------|
 | [bom.md](bom.md) | Parts list |
+| [impedance-model.md](impedance-model.md) | **Source/load fidelity @ 100 kHz** |
 | [setup.md](setup.md) | Physical bench wiring |
 | [test-procedure.md](test-procedure.md) | **Scope path (default)** + MCU path (optional) |
 | [detector-prototype.md](detector-prototype.md) | Optional MCU + I/Q breadboard |

@@ -15,7 +15,8 @@ Both paths use the same injector amplitude (200–500 mVpp at far end) and passi
 
 ## Prerequisites — scope path
 
-- [setup.md](setup.md) complete (passive AFE + scope probe point)
+- [setup.md](setup.md) complete (driver emulator + central AFE + PSU isolation)
+- [impedance-model.md](impedance-model.md) verification checklist passed
 - 12 V bench supply and DMM
 - Oscilloscope **≥100 MHz**, AC coupling (e.g. Rigol MSO1104Z + SA spectrum option)
 - External **100 kHz sine** source (function generator or Wein oscillator — MSO1104Z without `-S` has **no built-in AWG**)
@@ -45,15 +46,16 @@ Probe the **central AFE output** (after divider/clamp) — the node that feeds t
 
 ---
 
-### S2 — Injector trim (10 ft reference)
+### S2 — Injector trim (10 ft reference, loaded)
 
-**Goal:** Establish tone amplitude for **200–500 mVpp** at far end.
+**Goal:** Establish tone amplitude for **200–500 mVpp** on R/W at far end **with production-representative source and termination**.
 
-1. Use **10 ft** cable.
-2. Enable **100 kHz sine** at far-end injector.
-3. Scope on bus at **far end** (AC): adjust source until **200–500 mVpp**.
-4. Record generator settings and far-end mVpp.
-5. Measure **central AFE Vpp** with tone on — confirm well above `noise_Vpp`.
+1. Use **10 ft** cable; **central AFE connected**; far-end **load emulator** populated.
+2. Enable **100 kHz sine** through driver emulator (`R_s`, `C_inj` per [impedance-model.md](impedance-model.md)).
+3. Tune `R_s` / FG level until scope on **R/W at far end** (AC) reads **200–500 mVpp**.
+4. Record: `R_s`, `C_inj`, `C_bulk`, FG settings, measured far-end mVpp.
+5. Measure **central divider-output Vpp** — confirm well above `noise_Vpp`.
+6. Confirm PSU isolation (minimal HF at supply leads).
 
 ---
 
@@ -147,9 +149,12 @@ As S5 with MCU debounce + relay proxy GPIO.
 Validation path: Scope / MCU
 Date:
 Cable: 20/2, length ___ ft, routing notes:
-Inductor: ___ mH
-Divider ratio:
+L_dc_block: ___ mH
+L_feed (per zone): ___ mH
+R_divider ratio:
+Driver emulator: R_s=___ C_inj=___ C_bulk=___
 Scope: model ___, probe ___, coupling AC
+PSU HF isolation verified? Y/N
 
 --- Scope path ---
 noise_Vpp (tone off):
