@@ -2,83 +2,121 @@
 
 Supports PR 2b criterion **F6**: *No cross-talk false triggers on idle channels.*
 
-Also exercises rollout **Phase 0** item: *EMI 1 vs 6 sources.*
+Use the **scope path** by default. MCU path is optional ([detector-prototype.md](../tone-attenuation/detector-prototype.md)).
+
+**Reference margin:** From [S3](../tone-attenuation/test-procedure.md), `signal_Vpp` on an active channel at 60 ft. An idle channel **passes** if crosstalk Vpp stays **< signal_Vpp / 3** (same 3× rule as F5).
 
 ---
 
-## E0 — Baseline (all idle)
+## Scope path
 
-1. All 6 tone sources **off**; 12 V bus energized.
-2. Run detector for **10 minutes** (600 scans).
-3. Record any `signal_present[ch] == TRUE` events.
+Probe each channel's **central AFE output** (AC coupling). Let **`V_act`** = active-channel `signal_Vpp` from S3 (60 ft, same bundle geometry if possible).
+
+### C0 — Baseline (all idle)
+
+1. All tone sources **off**; 12 V energized.
+2. Measure Vpp on all 6 AFE outputs for **≥2 min**.
+3. Record max idle Vpp per channel.
 
 | Result | Criterion |
 |--------|-----------|
-| **PASS** | 0 false asserts on all channels |
+| **PASS** | No channel shows sustained Vpp approaching `V_act / 3` |
 
 ---
 
-## E1 — Single Active Channel
+### C1 — Single active channel
 
 For each channel **N** = 1..6:
 
-1. Enable tone **only** on channel N.
-2. Run **5 minutes**.
-3. Verify `signal_present[N] == TRUE` stable.
-4. Verify `signal_present[all others] == FALSE`.
+1. Enable tone **only** on channel N (100 kHz sine).
+2. Run **≥5 min**.
+3. **Active:** AFE Vpp on N ≈ expected (similar to S3 for that cable length).
+4. **Idle:** AFE Vpp on all other channels **< V_act / 3**.
+5. **SA/FFT:** Idle channels — no dominant 100 kHz peak near active level.
 
 | Result | Criterion |
 |--------|-----------|
-| **PASS** | Active only on N; 0 false on others |
+| **PASS** | Crosstalk on idle ch **< V_act / 3** each |
 
 ---
 
-## E2 — Six Simultaneous Tones (F6)
+### C2 — Six simultaneous tones (F6)
 
-1. Enable **100 kHz sine** on **all 6** channels simultaneously.
-2. Run **30 minutes**.
-3. Log per-channel `amplitude_proxy` min/max/mean.
-4. Verify each active channel detects; **no idle channel** falsely asserts.
+1. Enable **100 kHz sine** on **all 6** channels.
+2. Run **≥30 min**.
+3. Log AFE Vpp per channel (all should be “active” levels).
+4. Compare each channel's Vpp to its **C0 idle floor** — must remain well above idle, below clip.
+5. Re-check: with all on, no channel that is **muted** mid-test shows false “active” Vpp (see C3).
 
 | Result | Criterion |
 |--------|-----------|
-| **PASS** | All 6 detect; 0 false asserts on any channel |
-| FAIL | Any false assert → reposition bundle, add spacing, or reduce tone amplitude |
+| **PASS** | All 6 carry tone; idle-channel crosstalk limits from C1 never exceeded when others active |
 
 ---
 
-## E3 — Staggered Assert (burst crosstalk)
+### C3 — Staggered assert
 
-1. Channels 1–3 on; 4–6 off for 2 min.
-2. Swap: 4–6 on; 1–3 off for 2 min.
-3. Rapid toggle one channel at 1 Hz for 60 s while others idle.
+1. Channels 1–3 on; 4–6 off — **2 min**; measure idle 4–6 Vpp.
+2. Swap: 4–6 on; 1–3 off — **2 min**.
+3. Toggle one channel at **1 Hz** for 60 s; others off — monitor idle Vpp.
 
 | Result | Criterion |
 |--------|-----------|
-| **PASS** | No false assert on off channels during transitions |
+| **PASS** | Off channels stay **< V_act / 3** during transitions |
 
 ---
 
-## E4 — Harmonic Check (qualitative)
+### C4 — Harmonic check (qualitative)
 
-1. On single active channel, inspect far-end tone with scope FFT.
-2. Confirm fundamental **100 kHz** dominates; no strong square harmonics (3f, 5f).
+1. Single active channel; scope FFT/SA at far end.
+2. Fundamental **100 kHz** dominates (KD15).
 
 | Result | Criterion |
 |--------|-----------|
-| **PASS** | Sine-dominated spectrum (KD15) |
+| **PASS** | Sine-dominated; weak odd-harmonic comb suggests square wave — reject source |
 
 ---
 
-## Data Sheet (copy to PR 2b report)
+## MCU path (optional)
+
+Replace Vpp checks with `signal_present[ch]` and `amplitude_proxy` vs `threshold[ch]`.
+
+### E0 — Baseline
+
+All tones off; 10 min — 0 false `signal_present`.
+
+### E1 — Single active
+
+Tone on channel N only; 5 min — only N asserts.
+
+### E2 — Six simultaneous (F6)
+
+All on; 30 min — all detect, 0 false on idle.
+
+### E3 — Staggered assert
+
+As C3 with `signal_present` logging.
+
+---
+
+## Data sheet (copy to PR 2b report)
 
 ```text
+Validation path: Scope / MCU
 Date:
-Bundle description: length ___ ft, spacing ___
-Thresholds per ch: [ ... ]
+Bundle: length ___ ft, spacing ___, routing
+V_act reference (from S3): ___ mVpp
+Crosstalk limit (V_act/3): ___ mVpp
+
+C0 max idle Vpp per ch: [ ... ]
+C1 results ch 1-6: PASS/FAIL (idle Vpp values)
+C2 30 min notes:
+C3 transition worst idle Vpp: ___
+C4 spectrum OK? Y/N
+
+MCU path (if used):
 E0 false events: ___
-E1 results (1..6): PASS/FAIL each
-E2 duration: 30 min, false events: ___
-E3 transition false events: ___
+E1 results: ___
+E2 false events: ___
 Notes / mitigations:
 ```

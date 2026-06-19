@@ -1,12 +1,14 @@
 # EMI Bench — Multi-Zone Crosstalk
 
-Characterize **6 concurrent 100 kHz sine tones** on adjacent 20/2 runs — PR 2b criterion **F6**.
+Characterize coupling between **6 parallel 20/2 runs** — PR 2b criterion **F6**.
+
+Default validation: **scope + passive AFE per channel** (idle-channel Vpp or 100 kHz spectral peak). MCU `signal_present` logging is optional.
 
 | Artifact | Purpose |
 |----------|---------|
 | [setup.md](setup.md) | Multi-cable bench layout |
-| [test-procedure.md](test-procedure.md) | 1-vs-6 coupling tests |
+| [test-procedure.md](test-procedure.md) | Crosstalk tests (scope default) |
 
-Sine-only injection (KD15). Square-wave sources are **not** valid for this bench.
+Sine-only injection (KD15). Square-wave sources are **not** valid.
 
-**Outcome:** Recorded in `bench/reports/phase0-validation.md` and `go-no-go.md` (PR 2b).
+**Outcome:** `bench/reports/phase0-validation.md` and `go-no-go.md` (PR 2b).

@@ -1,56 +1,63 @@
 # Tone Attenuation Bench — BOM
 
-Minimum parts to run PR 2 tone-attenuation tests before PCB fab.
+Minimum parts for PR 2b **before PCB fab**. Default validation uses **scope + passive AFE** (no MCU required).
 
-## Cable & Power
+## Required — scope path
+
+### Cable & power
 
 | Qty | Part | Notes |
 |-----|------|-------|
-| 1 | 20/2 thermostat cable, **60 ft** | Unshielded; actual installed wire type if known |
-| 1 | 20/2 thermostat cable, **10 ft** | Short reference run |
-| 1 | 12 V DC bench supply, **≥2 A** | Current-limited; 12–18 V adjustable for margin tests |
+| 1 | 20/2 thermostat cable, **60 ft** | Unshielded; match installed wire if known |
+| 1 | 20/2 thermostat cable, **10 ft** | Injector trim (S2) |
+| 1 | 12 V DC bench supply, **≥2 A** | Current-limited (e.g. Eventek KPS305D) |
 | 1 | DMM | Bus voltage, loop drop |
 | 2 | Banana-to-wire leads | R/W connections |
 
-## Tone Injection (Thermostat End — Simulated)
+### Tone injection (far end)
 
-Use either **Option A** (function generator, fastest) or **Option B** (breadboard oscillator, matches production topology).
+Rigol **MSO1104Z** (without `-S`) has **no AWG**; `SA-DS1000Z` is spectrum analysis only. Use an external sine source.
 
-### Option A — Function Generator (recommended for PR 2b)
+**Option A — Function generator (fastest)**
 
 | Qty | Part | Notes |
 |-----|------|-------|
 | 1 | Function generator | Sine, **100 kHz**, adjustable amplitude |
-| 1 | Coupling cap, **100 nF** ceramic | In series with gen output |
-| 1 | Resistor, **100 Ω** | Series limit / Z match (tune on bench) |
-| 1 | N-channel MOSFET (e.g. 2N7002) | Optional: switch tone on/off for F1 timing |
-| 1 | 10 kΩ resistor | Gate pull-down, default-off |
+| 1 | Coupling cap, **100 nF** ceramic | Series with output |
+| 1 | Resistor, **100 Ω** | Series limit (tune) |
 
-### Option B — Sine Oscillator Breadboard
+**Option B — Wein / Colpitts breadboard**
 
 | Qty | Part | Notes |
 |-----|------|-------|
-| 1 | Wein or Colpitts 100 kHz oscillator | KD15 — sine only |
+| 1 | 100 kHz sine oscillator | KD15 — sine only, not square |
 | 1 | Coupling cap, **100 nF** | AC injection to bus |
-| 1 | N-FET bus driver | Same as production concept |
-| — | Passive set per calculated Wein/Colpitts | Trim to 100 kHz ±2% |
+| 1 | N-FET bus driver | Production topology |
 
-## Central Detector Prototype (Far / Central End)
+### Central AFE + measurement (near end)
 
 | Qty | Part | Notes |
 |-----|------|-------|
-| 1 | MCU dev board | STM32 Nucleo-G071RB or equivalent (12-bit ADC, ≥1 Msps) |
 | 1 | Inductor, **1.0 mH** | Feed inductor (470 µH–2.2 mH swap kit optional) |
 | 1 | Cap, **100 nF** | AC coupling |
 | 2 | Resistors, **10 kΩ + 3.3 kΩ** | Divider starting point (tune) |
-| 1 | TVS or Schottky clamp | 3.3 V ADC protection |
-| 1 | 8:1 analog mux | ADG708 or CD4051 (single channel OK for PR 2) |
-| 1 | SPST relay module or LED+driver | Visual relay-close proxy for F1 |
-| 1 | Oscilloscope, **≥100 MHz** | Verify sine, amplitude, tone on/off |
+| 1 | TVS or Schottky clamp | Protect scope / future ADC node |
+| 1 | Oscilloscope, **≥100 MHz** | AC Vpp at AFE output; FFT/SA for 100 kHz check |
 
-## Optional
+## Optional — MCU path
+
+Add only for end-to-end I/Q firmware bring-up (see [detector-prototype.md](detector-prototype.md)).
 
 | Qty | Part | Notes |
 |-----|------|-------|
-| 1 | Second 60 ft spool | Spare if first cable damaged |
-| 1 | Cable reel / tape | Keep 60 ft run neat; document routing |
+| 1 | STM32 Nucleo-G071RB | 12-bit ADC, ≥1 Msps |
+| 1 | 8:1 analog mux | ADG708 or CD4051 (6-ch EMI) |
+| 1 | SPST relay module or LED | F1 timing with debounce firmware |
+| 1 | N-channel MOSFET + 10 kΩ | Optional tone gate for T5 |
+
+## Optional — general
+
+| Qty | Part | Notes |
+|-----|------|-------|
+| 1 | Second 60 ft spool | Spare cable |
+| 1 | Cable reel / tape | Neat 60 ft run; document routing |

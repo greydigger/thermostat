@@ -3,74 +3,69 @@
 ## Topology
 
 ```text
-[12 V PSU] ── R ─────────────────────────────────────── R ── [Central AFE + MCU]
-              │         60 ft 20/2 (or 10 ft reference)      │
-              W ───────────────────────────────────────────── W
+[12 V PSU] ── R ─────────────────────────────────────── R ── [Central passive AFE]
+              │         60 ft 20/2 (or 10 ft reference)      │      │
+              W ───────────────────────────────────────────── W      └── Scope CH (AC)
               │
          [Tone injector @ thermostat end]
               100 kHz sine, AC-coupled onto R/W
 ```
 
-- **R** = +12 V
-- **W** = return (common)
-- Tone injector sits at the **thermostat (far) end** to mimic production.
-- Central **detector prototype** sits at the **boiler-room (near) end**.
+- **R** = +12 V, **W** = return
+- Tone injector at **far (thermostat) end**
+- **Central passive AFE** at boiler-room end — scope probes the AFE output (production ADC node)
+- MCU + mux are **optional** (replace scope with ADC when using MCU path)
 
-## Wiring Steps
+## Wiring steps
 
-### 1. DC Bus
+### 1. DC bus
 
-1. Connect bench PSU **+** to cable **R**, PSU **−** to cable **W** at the central end.
+1. Bench PSU **+** → cable **R**, PSU **−** → cable **W** at central end.
 2. Set **12.0 V**, current limit **200 mA** initially.
-3. Measure `V_bus` at central and far ends. Record drop (expect ≤188 mV @ 150 mA).
+3. DMM at central and far ends; record drop (expect ≤188 mV @ 150 mA).
 
-### 2. Tone Injection (Far End)
-
-**Function-generator path:**
+### 2. Tone injection (far end)
 
 ```text
-Gen OUT ──[100 nF]──┬── R wire (thermostat end)
+Gen OUT ──[100 nF]──┬── R wire (far end)
                     │
-                   [100 Ω] to W (return)
+                   [100 Ω]── W
 ```
 
-1. Configure generator: **100 kHz sine**, 1 Vpp starting amplitude (adjust later).
-2. Enable output; confirm **200–500 mVpp** tone at far end on scope (AC coupling).
-3. For OOK / F1 tests: gate generator with MOSFET on `TONE_EN` proxy, default-off.
+1. **100 kHz sine**; start ~1 Vpp at source, trim in S2.
+2. Confirm **200–500 mVpp** on bus at far end (scope, AC coupling).
+3. Verify sine with FFT/SA — not square (KD15).
 
-### 3. Central Detector AFE
+**Instruments:** External FG or Wein board required on MSO1104Z (non-`-S`). SA-DS1000Z helps analyze spectrum; it does not generate tone.
 
-Per channel (single channel sufficient for PR 2):
+### 3. Central passive AFE (scope probe point)
 
 ```text
-R wire ──[1.0 mH]──┬──[100 nF]──[divider]──[clamp]── MUX ── ADC
-                   │
-                  W
+R ──[1.0 mH]──┬──[100 nF]──[divider]──[clamp]──┬── Scope CH (high-Z, AC)
+              │                                 └── (optional) MUX → MCU ADC
+             W
 ```
 
-1. Feed inductor on **R** leg; return at **W**.
-2. AC-couple and attenuate to **0–3.3 V** peak at ADC pin.
-3. Verify no ADC clipping at max tone amplitude.
+1. Feed inductor on **R**; return at **W**.
+2. Scope on divider output; **AC coupling** for S1/S3.
+3. Adjust divider so tone **on** does not clip clamp; tone **off** shows low idle Vpp.
 
-### 4. Cable Routing
+### 4. Cable routing
 
-For the **60 ft** run:
-
-- Unspool full length; avoid tight coils (adds stray L/C).
-- Keep parallel to typical install: along floor/wall if possible.
-- Record routing notes in PR 2b report (affects parasitic C).
+- Unspool **60 ft**; avoid tight coils.
+- Document routing for PR 2b report.
 
 ### 5. Safety
 
-- Fuse or current-limited supply; do not exceed **150 mA** per-zone design limit during sustained tests.
-- Disconnect before changing divider/clamp components.
-- Central relay proxy is **not** connected to live boiler wiring in Phase 0.
+- Current-limited supply; ≤**150 mA** sustained per zone.
+- No live boiler wiring in Phase 0.
 
-## Quick Sanity Check
+## Quick sanity check
 
 | Check | Expected |
 |-------|----------|
 | DC on bus | 12 V ±5% at central |
 | Tone frequency | 100 kHz ±2% |
-| Waveform | Sine (not square) |
-| Tone off | ADC noise floor stable, relay open |
+| Waveform | Sine (FFT fundamental dominates) |
+| Tone off | Low, stable AFE Vpp (noise floor) |
+| Tone on (10 ft) | AFE Vpp clearly above noise floor |

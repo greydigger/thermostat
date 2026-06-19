@@ -2,19 +2,19 @@
 
 ## Goal
 
-Simulate **6 zone home runs** in close proximity (worst-case routing) and verify **no false heat calls** on idle channels when one or all channels carry tone.
+Simulate **6 zone home runs** in close proximity and verify **idle channels do not pick up enough tone** to exceed the detect margin used in [tone-attenuation S3](../tone-attenuation/test-procedure.md).
 
-## Minimum Physical Layout
+## Minimum physical layout
 
 ```text
-Central PSU + detector mux (6 ch)
+Central PSU + 6× passive AFE (or 6 scope probe points)
     │
-    ├── Cable 1 (60 ft or 20 ft folded) ── Tone injector 1
+    ├── Cable 1 ── Tone injector 1
     ├── Cable 2 ── Tone injector 2
     ├── ...
     └── Cable 6 ── Tone injector 6
 
-Cables bundled parallel for ≥30 ft (tape together — mimics crowded joists)
+Cables bundled parallel ≥30 ft (tape together)
 ```
 
 | Parameter | Recommendation |
@@ -24,26 +24,27 @@ Cables bundled parallel for ≥30 ft (tape together — mimics crowded joists)
 | Spacing | **≤1 in** center-to-center in bundle |
 | Ground reference | All W returns tied at central star point |
 
-## Tone Sources
+## Measurement — scope path (default)
+
+- One **passive AFE + scope CH** per channel (or mux + single scope sequentially).
+- Record **AC Vpp** at each idle channel's AFE output.
+- **SA/FFT:** 100 kHz peak on idle channels should stay **< ⅓** of weakest active-channel `signal_Vpp` from S3 (equivalent to 3× detect margin).
+
+## Tone sources
 
 - **6×** independent **100 kHz sine** sources (generators or oscillators).
-- Phase uncorrelated between channels (acceptable).
-- Amplitude per channel: same setting validated in [tone-attenuation T2](../tone-attenuation/test-procedure.md).
+- Amplitude per channel: same setting from [tone-attenuation S2](../tone-attenuation/test-procedure.md).
 
-## Central Detector
+## Central detector — MCU path (optional)
 
-- Full **6-channel mux** round-robin per [detector-prototype.md](../tone-attenuation/detector-prototype.md).
-- Per-channel `threshold[]` from T3 (can share nominal value initially).
+- 6-ch mux + I/Q firmware per [detector-prototype.md](../tone-attenuation/detector-prototype.md).
+- Log `signal_present[ch]` and `amplitude_proxy`.
 
-## What Is *Not* Required for PR 2
+## What is not required
 
-- Anechoic chamber
-- Certified EMC lab
-- FCC filing
-
-This is **DIY characterization** per DESIGN scope (KD11).
+- Anechoic chamber, certified EMC lab, FCC filing (KD11 DIY scope).
 
 ## Safety
 
-- Same 12 V bench limits as tone-attenuation setup.
-- No connection to live hydronic or line voltage.
+- Same 12 V limits as tone-attenuation setup.
+- No live hydronic wiring.

@@ -148,11 +148,15 @@ Compare `amplitude_proxy` to a per-channel threshold (calibrated in PR 2b). Pass
 
 ## Bench Validation Mapping
 
-| Test | Protocol requirement | Bench doc |
-|------|---------------------|-----------|
-| F1 | Tone stop → relay open < 2 s | [tone-attenuation/test-procedure.md](../bench/tone-attenuation/test-procedure.md) |
-| F5 | 60 ft detect, I²+Q² ≥ 3× noise floor | [tone-attenuation/test-procedure.md](../bench/tone-attenuation/test-procedure.md) |
-| F6 | 6-zone EMI, no false triggers | [emi/test-procedure.md](../bench/emi/test-procedure.md) |
+Phase 0 lab work validates **physical plant**: tone attenuation and inter-channel crosstalk. Detector I/Q firmware may be proven separately (PR 13); bench default uses **scope Vpp** at the central AFE output.
+
+| Test | Protocol requirement | Bench evidence (default) | Bench doc |
+|------|---------------------|--------------------------|-----------|
+| F1 | Tone stop → relay open < 2 s | Optional on bench; PR 4b/PR 13 | [tone-attenuation/test-procedure.md](../bench/tone-attenuation/test-procedure.md) S5 |
+| F5 | 60 ft detect, ≥ 3× noise margin | `signal_Vpp / noise_Vpp` ≥ 3 at AFE output (scope) | [tone-attenuation/test-procedure.md](../bench/tone-attenuation/test-procedure.md) S3 |
+| F6 | 6-zone EMI, no false triggers | Idle-channel Vpp < `V_act / 3` (scope) | [emi/test-procedure.md](../bench/emi/test-procedure.md) C1–C3 |
+
+**Optional:** MCU path — `amplitude_proxy` (I²+Q²) and `signal_present[]` per [detector-prototype.md](../bench/tone-attenuation/detector-prototype.md).
 
 Full go/no-go sign-off: **PR 2b** (`bench/reports/`).
 

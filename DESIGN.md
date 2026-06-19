@@ -1011,7 +1011,7 @@ PR 1, 2, **2b**, 3, 5, 6, 7, 9, 10, **14a** — minimum for one supervised live 
 
 **Dependencies:** PR 1
 
-**Description:** Bench setup for 60 ft 20/2; sine tone injection; central detector prototype.
+**Description:** Bench setup for 60 ft 20/2; sine tone injection; passive central AFE + scope (default) for attenuation/crosstalk; optional MCU I/Q prototype.
 
 ---
 
